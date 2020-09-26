@@ -1,0 +1,11 @@
+name: nn-gen-art
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - matplotlib
+  - numpy
+  - noise
+  - pytorch
+  - ipykernel
+prefix: /home/tnwei/miniconda3/envs/nn-gen-art
