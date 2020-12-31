@@ -8,4 +8,5 @@ dependencies:
   - noise
   - pytorch
   - ipykernel
+  - ipywidgets
 prefix: /home/tnwei/miniconda3/envs/nn-gen-art
