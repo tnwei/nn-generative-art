@@ -2,66 +2,255 @@ import torch.nn as nn
 import numpy as np
 import torch
 
+
 class Net(nn.Module):
     """
-    Input is normalized (x, y), output is RGB color at that point.
+    Describes a generative CPPN that takes `x`, `y`, and optionally distance to origin as input,
+    and outputs 3-channel / 1-channel pixel intensity.
     """
-    def __init__(self, num_hidden_layers=4, num_neurons=8):
+
+    def __init__(
+        self,
+        num_hidden_layers=4,
+        num_neurons=8,
+        latent_len=3,
+        include_bias=True,
+        include_dist_to_origin=True,
+        rgb=True,
+    ):
+        """
+        Initializes the CPPN.
+
+        Inputs
+        ------
+        num_hidden_layers: int
+            Number of hidden layers in the network.
+
+        num_neurons: int
+            Number of neurons in each hidden layer.
+
+        latent_len: int
+            Length of latent vector
+
+        include_bias: bool
+            If True, includes bias term in input layer.
+
+        include_dist_to_origin: bool
+            If True, includes distance to origin as one of the inputs.
+
+        rgb: bool
+            If True, produces 3-channel output. Else, produces 1-channel output.
+
+        Output
+        ------
+        None
+        """
         super(Net, self).__init__()
-        
+
         # Input layer
-        layers = [nn.Linear(2, num_neurons, bias=False), nn.Tanh()]
-        
+        if include_dist_to_origin:
+            layers = [
+                nn.Linear(3 + latent_len, num_neurons, bias=include_bias),
+                nn.Tanh(),
+            ]
+        else:
+            layers = [
+                nn.Linear(2 + latent_len, num_neurons, bias=include_bias),
+                nn.Tanh(),
+            ]
+
         # Hidden layers
-        layers.extend(num_hidden_layers * [nn.Linear(num_neurons, num_neurons, bias=False), nn.Tanh(),])
-            
+        layers.extend(
+            num_hidden_layers
+            * [
+                nn.Linear(num_neurons, num_neurons, bias=False),
+                nn.Tanh(),
+            ]
+        )
+
         # Output layer
-        layers.extend([nn.Linear(num_neurons, 3, bias=False), nn.Sigmoid()])
-        
-        self.layers = nn.Sequential(*layers) 
-        
-    def forward(self, x):
+        if rgb:
+            layers.extend([nn.Linear(num_neurons, 3, bias=False), nn.Sigmoid()])
+        else:
+            layers.extend([nn.Linear(num_neurons, 1, bias=False), nn.Sigmoid()])
+
+        # Assign layers to self.layers
+        self.layers = nn.Sequential(*layers)
+
+        # Run weight init
+        self.init_weights()
+
+    def forward(self, loc_vec, latent_vec):
+        """
+        `forward` function for the generative network.
+
+        Input
+        -----
+        loc_vec, latent_vec: torch.Tensor
+            Location vector and latent vector.
+            Location vector should have shape (N, 2) or shape (N, 3).
+            Latent vector should have shape (N, `latent_len`)
+
+        Output
+        ------
+        x: torch.Tensor
+        """
+        x = torch.cat([loc_vec, latent_vec], dim=1)
         x = self.layers(x)
         return x
-    
-def init_weights(m):
+
+    def _init_weights(self, m):
+        """
+        Function to apply to the generative network (literally with `Net.apply()`) to initialize
+        network weights properly. Required as the default initialization is for deep learning
+        training, while we're only interested in starting all layers with a normal distribution.
+
+        Ref: https://stackoverflow.com/questions/49433936/how-to-initialize-weights-in-pytorch
+
+        Input
+        -----
+        m: nn.Modules (I think)
+
+        Output
+        ------
+        None
+        """
+        if type(m) == nn.Linear:
+            nn.init.normal_(m.weight, mean=0, std=1)
+
+    def init_weights(self):
+        """
+        Initializes the weights of the network.
+
+        Input
+        -----
+        None
+
+        Output
+        ------
+        None
+        """
+        self.apply(self._init_weights)
+
+
+def create_input(img_width, img_height, include_dist_to_origin=True):
     """
-    Ref: https://stackoverflow.com/questions/49433936/how-to-initialize-weights-in-pytorch
+    Creates the input for the generative net.
+
+    Input
+    -----
+    img_width, img_height: int
+    include_dist_to_origin: bool
+
+    Output
+    ------
+    input_arr: np.ndarray
+        Should have shape (img_width * img_height, 2)
     """
-    if type(m) == nn.Linear:
-        nn.init.normal_(m.weight, mean=0, std=1)
-        
-def create_input(img_width, img_height):
-    """
-    Creates the input for the generative net. 
-    Outputs numpy array w/ shape (img_width * img_height, 2)
-    """
-    # Create vectors of xs and ys   
+    # Create vectors of xs and ys
     xs = np.linspace(start=-1, stop=1, num=img_width)
     ys = np.linspace(start=-1, stop=1, num=img_height)
-    
+
     # Use np.meshgrid to create a mesh grid
     xv, yv = np.meshgrid(xs, ys)
     input_arr = np.stack((xv, yv), axis=2)
-    input_arr = input_arr.reshape(img_width * img_height, 2)
+
+    if include_dist_to_origin:
+        dist_to_origin = np.sum(np.square(input_arr), axis=2, keepdims=True)
+        input_arr = np.concatenate([input_arr, dist_to_origin], axis=2)
+        input_arr = input_arr.reshape(img_width * img_height, 3)
+    else:
+        input_arr = input_arr.reshape(img_width * img_height, 2)
+
     return input_arr
 
-def create_net(num_hidden_layers=4, num_neurons=8):
-    net = Net(num_hidden_layers=num_hidden_layers, num_neurons=num_neurons).double()
-    net.apply(init_weights)
-    return net
 
-def generate_abstract_art(img_width, img_height, net):
-    # Create input to net
-    net_input = torch.tensor(create_input(img_width, img_height)).double()
-    
+def generate_one_art(
+    net, latent_vec, input_config={"img_width": 320, "img_height": 320}
+):
+    """
+    Wrapper function to generate a single image output from the given network.
+
+    Input
+    -----
+    net: Net
+    latent_vec: torch.Tensor
+    input_config: dict
+        Dict of parameters to be passed to `create_input` as kwargs.
+
+    Output
+    ------
+    net_output: np.ndarray
+        Should have shape (y, x, 3) or (y, x, 1)
+    """
+    # Create input to net, and convert from ndarray to torch.FloatTensor
+    net_input = torch.tensor(create_input(**input_config)).float()
+
+    # Create input array from latent_vec, and convert from ndarray to torch.FloatTensor
+    latent_vec = np.expand_dims(latent_vec, axis=0)
+    latent_vec = np.repeat(latent_vec, repeats=net_input.shape[0], axis=0)
+    latent_vec = torch.tensor(latent_vec).float()
+
+    assert net_input.shape == latent_vec.shape
+
     # Run input through net
-    net_output = net(net_input).detach().numpy()
-    
-    # Reshape into (x, y, 3) for plotting
-    net_output = net_output.reshape(320, 320, 3)
-    
+    net_output = net(net_input, latent_vec).detach().numpy()
+
+    # Reshape into (y, x, 3) for plotting in PIL
+    net_output = net_output.reshape(
+        input_config["img_height"], input_config["img_width"], -1
+    )
+
     # Re-format to color output
     # Scale to range 0 to 255, and set type to int
     net_output = (net_output * 255).astype(np.uint8)
     return net_output
+
+
+def generate_one_gallery(
+    net_config={"num_hidden_layers": 4, "num_neurons": 8, "include_bias": True},
+    input_config={"img_width": 320, "img_height": 320},
+):
+    """
+    Plots grid of 40 images, accepting net_config as dict containing parameters to Net constructor.
+    From these images, the ones in a column are the same network but have their latent vector perturbed.
+
+    Input
+    -----
+    net_config: dict
+        Dict of parameters to be passed to `Net()` as kwargs.
+
+    input_config: dict
+        Dict of parameters to be passed to `create_input` through `generate_one_art` as kwargs.
+
+    Output
+    ------
+    None
+    """
+    fig, ax = plt.subplots(ncols=10, nrows=4, figsize=(16, 6))
+
+    for i in range(10):
+        net = Net(**net_config)
+        latent_vec = np.random.normal(size=(3,))
+
+        for j in range(4):
+            out = generate_one_art(
+                net, latent_vec=latent_vec, input_config=input_config
+            )
+            latent_vec += 0.2
+
+            # if (n, n, 1) output i.e. if grayscale
+            if out.shape[2] == 1:
+                img = Image.fromarray(
+                    np.squeeze(out), mode="L"
+                )  # Mode inference is automatic but better be explicit
+                ax[j, i].imshow(img, cmap="gray")
+            else:
+                img = Image.fromarray(out, mode="RGB")
+                ax[j, i].imshow(img, cmap="gray")
+
+            ax[j, i].xaxis.set_visible(False)
+            ax[j, i].yaxis.set_visible(False)
+
+    plt.tight_layout()
+    plt.show()
