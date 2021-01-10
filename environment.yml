@@ -5,8 +5,9 @@ channels:
 dependencies:
   - matplotlib
   - numpy
-  - noise
   - pytorch
   - ipykernel
+  - opencv
   - ipywidgets
+  - tqdm
 prefix: /home/tnwei/miniconda3/envs/nn-gen-art
