@@ -1,7 +1,8 @@
 import torch.nn as nn
 import numpy as np
 import torch
-
+import matplotlib.pyplot as plt
+from PIL import Image
 
 class Net(nn.Module):
     """
@@ -191,7 +192,8 @@ def generate_one_art(
     latent_vec = np.repeat(latent_vec, repeats=net_input.shape[0], axis=0)
     latent_vec = torch.tensor(latent_vec).float()
 
-    assert net_input.shape == latent_vec.shape
+    assert net_input.shape == latent_vec.shape, ("Shape of net_input is "
+    f"{net_input.shape} while shape of latent_vec is {latent_vec.shape}")
 
     # Run input through net
     net_output = net(net_input, latent_vec).detach().numpy()
@@ -227,7 +229,7 @@ def generate_one_gallery(
     ------
     None
     """
-    fig, ax = plt.subplots(ncols=10, nrows=4, figsize=(16, 6))
+    _, ax = plt.subplots(ncols=10, nrows=4, figsize=(16, 6))
 
     for i in range(10):
         net = Net(**net_config)
