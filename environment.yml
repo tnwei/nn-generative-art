@@ -10,4 +10,5 @@ dependencies:
   - opencv
   - ipywidgets
   - tqdm
+  - pylint
 prefix: /home/tnwei/miniconda3/envs/nn-gen-art
