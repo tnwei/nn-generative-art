@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
             # Already averages < 1.5 FPS on my laptop
             # But including an FPS cap here for fast machines
-            time.sleep(1/max_fps)
+            time.sleep(1 / max_fps)
 
             # Convert to BGR
             out = cv2.cvtColor(out, cv2.COLOR_RGB2BGR)

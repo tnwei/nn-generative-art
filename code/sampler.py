@@ -1,21 +1,22 @@
 """
-This module includes the latent space sampler object that enables sampling 
+This module includes the latent space sampler object that enables sampling
 smooth (enough) trajectories within a designated latent space.
 """
 
 import numpy as np
+from typing import NoReturn, Generator
 
 
 class LatentSpaceSampler:
     def __init__(
         self,
-        dims=3,
-        init_coord=np.array([0, 0, 0]),
-        stepsize=0.01,
-        min_coord=np.array([-1, -1, -1]),
-        max_coord=np.array([1, 1, 1]),
-        smooth_start_stop=True,
-    ):
+        dims: int = 3,
+        init_coord: np.ndarray = np.array([0, 0, 0]),
+        stepsize: float = 0.01,
+        min_coord: np.ndarray = np.array([-1, -1, -1]),
+        max_coord: np.ndarray = np.array([1, 1, 1]),
+        smooth_start_stop: bool = True,
+    ) -> NoReturn:
         """
         Input
         -----
@@ -52,7 +53,7 @@ class LatentSpaceSampler:
         # Initialize the generator
         self._init_generator()
 
-    def _init_generator(self):
+    def _init_generator(self) -> NoReturn:
         # Writing it this way to leave flexibility for implementing other generators
         self.generator = self._point2point_latent_explorer_generator(
             dims=self.dims,
@@ -64,8 +65,14 @@ class LatentSpaceSampler:
         )
 
     def _point2point_latent_explorer_generator(
-        self, dims, min_coord, max_coord, init_coord, stepsize, smooth_start_stop
-    ):
+        self,
+        dims: int,
+        min_coord: np.ndarray,
+        max_coord: np.ndarray,
+        init_coord: np.ndarray,
+        stepsize: float,
+        smooth_start_stop: bool,
+    ) -> Generator[np.ndarray, None, None]:
         current_point = init_coord
         while True:
             # Find next point
@@ -124,7 +131,9 @@ class LatentSpaceSampler:
 
             current_point = next_point
 
-    def sample(self, iterations=1, return_value_if_one=True):
+    def sample(
+        self, iterations: int = 1, return_value_if_one: bool = True
+    ) -> np.ndarray:
         """
         Explore latent space by travelling to a randomly selected point.
         This process is repeated until the number of steps as specified by
@@ -132,11 +141,6 @@ class LatentSpaceSampler:
         returned together with the path lengths. If `iterations` is None, continuously produces frames.
 
         The heavy lifting is done in the generator object created by `_create_generator`, this is simply the sampling function.
-
-        Output
-        ------
-        pos_arr: np.ndarray
-        path_lengths: List[Int]
 
         """
         if iterations is None:

@@ -3,6 +3,8 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from PIL import Image
+from typing import List, Dict, Any, NoReturn
+
 
 class Net(nn.Module):
     """
@@ -12,35 +14,24 @@ class Net(nn.Module):
 
     def __init__(
         self,
-        num_hidden_layers=4,
-        num_neurons=8,
-        latent_len=3,
-        include_bias=True,
-        include_dist_to_origin=True,
-        rgb=True,
-    ):
+        num_hidden_layers: int = 4,
+        num_neurons: int = 8,
+        latent_len: int = 3,
+        include_bias: bool = True,
+        include_dist_to_origin: bool = True,
+        rgb: bool = True,
+    ) -> NoReturn:
         """
         Initializes the CPPN.
 
         Inputs
         ------
-        num_hidden_layers: int
-            Number of hidden layers in the network.
-
-        num_neurons: int
-            Number of neurons in each hidden layer.
-
-        latent_len: int
-            Length of latent vector
-
-        include_bias: bool
-            If True, includes bias term in input layer.
-
-        include_dist_to_origin: bool
-            If True, includes distance to origin as one of the inputs.
-
-        rgb: bool
-            If True, produces 3-channel output. Else, produces 1-channel output.
+        num_hidden_layers: Number of hidden layers in the network.
+        num_neurons: Number of neurons in each hidden layer.
+        latent_len: Length of latent vector
+        include_bias: If True, includes bias term in input layer.
+        include_dist_to_origin: If True, includes distance to origin as one of the inputs.
+        rgb: If True, produces 3-channel output. Else, produces 1-channel output.
 
         Output
         ------
@@ -50,12 +41,16 @@ class Net(nn.Module):
 
         # Input layer
         if include_dist_to_origin:
-            layers = [
+            layers: List[Any] = [
+                # 3 base inputs per pixel: x, y, distance to origin
+                # on top of the latent vector
                 nn.Linear(3 + latent_len, num_neurons, bias=include_bias),
                 nn.Tanh(),
             ]
         else:
-            layers = [
+            layers: List[Any] = [
+                # 2 base inputs per pixel: x, y
+                # on top of the latent vector
                 nn.Linear(2 + latent_len, num_neurons, bias=include_bias),
                 nn.Tanh(),
             ]
@@ -63,10 +58,7 @@ class Net(nn.Module):
         # Hidden layers
         layers.extend(
             num_hidden_layers
-            * [
-                nn.Linear(num_neurons, num_neurons, bias=False),
-                nn.Tanh(),
-            ]
+            * [nn.Linear(num_neurons, num_neurons, bias=False), nn.Tanh()]
         )
 
         # Output layer
@@ -76,18 +68,18 @@ class Net(nn.Module):
             layers.extend([nn.Linear(num_neurons, 1, bias=False), nn.Sigmoid()])
 
         # Assign layers to self.layers
-        self.layers = nn.Sequential(*layers)
+        self.layers: nn.Sequential = nn.Sequential(*layers)
 
         # Run weight init
         self.init_weights()
 
-    def forward(self, loc_vec, latent_vec):
+    def forward(self, loc_vec: torch.Tensor, latent_vec: torch.Tensor) -> torch.Tensor:
         """
         `forward` function for the generative network.
 
         Input
         -----
-        loc_vec, latent_vec: torch.Tensor
+        loc_vec, latent_vec:
             Location vector and latent vector.
             Location vector should have shape (N, 2) or shape (N, 3).
             Latent vector should have shape (N, `latent_len`)
@@ -100,7 +92,7 @@ class Net(nn.Module):
         x = self.layers(x)
         return x
 
-    def _init_weights(self, m):
+    def _init_weights(self, m) -> NoReturn:
         """
         Function to apply to the generative network (literally with `Net.apply()`) to initialize
         network weights properly. Required as the default initialization is for deep learning
@@ -110,31 +102,26 @@ class Net(nn.Module):
 
         Input
         -----
-        m: nn.Modules (I think)
+        m: various subclases in torch.nn.modules.* (I think?), called recursively
+        using the `children.()` method.
 
         Output
         ------
         None
         """
-        if type(m) == nn.Linear:
+        if isinstance(m, nn.Linear):
             nn.init.normal_(m.weight, mean=0, std=1)
 
-    def init_weights(self):
+    def init_weights(self) -> NoReturn:
         """
         Initializes the weights of the network.
-
-        Input
-        -----
-        None
-
-        Output
-        ------
-        None
         """
         self.apply(self._init_weights)
 
 
-def create_input(img_width, img_height, include_dist_to_origin=True):
+def create_input(
+    img_width: int, img_height: int, include_dist_to_origin: bool = True
+) -> np.ndarray:
     """
     Creates the input for the generative net.
 
@@ -167,8 +154,10 @@ def create_input(img_width, img_height, include_dist_to_origin=True):
 
 
 def generate_one_art(
-    net, latent_vec, input_config={"img_width": 320, "img_height": 320}
-):
+    net: Net,
+    latent_vec: torch.Tensor,
+    input_config: Dict[str, Any] = {"img_width": 320, "img_height": 320},
+) -> np.ndarray:
     """
     Wrapper function to generate a single image output from the given network.
 
@@ -192,8 +181,10 @@ def generate_one_art(
     latent_vec = np.repeat(latent_vec, repeats=net_input.shape[0], axis=0)
     latent_vec = torch.tensor(latent_vec).float()
 
-    assert net_input.shape == latent_vec.shape, ("Shape of net_input is "
-    f"{net_input.shape} while shape of latent_vec is {latent_vec.shape}")
+    assert net_input.shape == latent_vec.shape, (
+        "Shape of net_input is "
+        f"{net_input.shape} while shape of latent_vec is {latent_vec.shape}"
+    )
 
     # Run input through net
     net_output = net(net_input, latent_vec).detach().numpy()
@@ -210,9 +201,13 @@ def generate_one_art(
 
 
 def generate_one_gallery(
-    net_config={"num_hidden_layers": 4, "num_neurons": 8, "include_bias": True},
-    input_config={"img_width": 320, "img_height": 320},
-):
+    net_config: Dict[str, Any] = {
+        "num_hidden_layers": 4,
+        "num_neurons": 8,
+        "include_bias": True,
+    },
+    input_config: Dict[str, Any] = {"img_width": 320, "img_height": 320},
+) -> NoReturn:
     """
     Plots grid of 40 images, accepting net_config as dict containing parameters to Net constructor.
     From these images, the ones in a column are the same network but have their latent vector perturbed.
