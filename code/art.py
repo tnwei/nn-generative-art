@@ -39,36 +39,15 @@ class Net(nn.Module):
         """
         super(Net, self).__init__()
 
-        # Input layer
-        if include_dist_to_origin:
-            layers: List[Any] = [
-                # 3 base inputs per pixel: x, y, distance to origin
-                # on top of the latent vector
-                nn.Linear(3 + latent_len, num_neurons, bias=include_bias),
-                nn.Tanh(),
-            ]
-        else:
-            layers: List[Any] = [
-                # 2 base inputs per pixel: x, y
-                # on top of the latent vector
-                nn.Linear(2 + latent_len, num_neurons, bias=include_bias),
-                nn.Tanh(),
-            ]
-
-        # Hidden layers
-        layers.extend(
-            num_hidden_layers
-            * [nn.Linear(num_neurons, num_neurons, bias=False), nn.Tanh()]
+        # Run arch init
+        self.layers: nn.Sequential = self.init_arch(
+            num_hidden_layers=num_hidden_layers,
+            num_neurons=num_neurons,
+            latent_len=latent_len,
+            include_bias=include_bias,
+            include_dist_to_origin=include_dist_to_origin,
+            rgb=rgb,
         )
-
-        # Output layer
-        if rgb:
-            layers.extend([nn.Linear(num_neurons, 3, bias=False), nn.Sigmoid()])
-        else:
-            layers.extend([nn.Linear(num_neurons, 1, bias=False), nn.Sigmoid()])
-
-        # Assign layers to self.layers
-        self.layers: nn.Sequential = nn.Sequential(*layers)
 
         # Run weight init
         self.init_weights()
@@ -117,6 +96,49 @@ class Net(nn.Module):
         Initializes the weights of the network.
         """
         self.apply(self._init_weights)
+
+    def init_arch(
+        self,
+        num_hidden_layers,
+        num_neurons,
+        latent_len,
+        include_bias,
+        include_dist_to_origin,
+        rgb,
+    ) -> nn.Sequential:
+        """
+        Initializes the architecture of the network.
+        """
+        # Input layer
+        if include_dist_to_origin:
+            layers: List[Any] = [
+                # 3 base inputs per pixel: x, y, distance to origin
+                # on top of the latent vector
+                nn.Linear(3 + latent_len, num_neurons, bias=include_bias),
+                nn.Tanh(),
+            ]
+        else:
+            layers: List[Any] = [
+                # 2 base inputs per pixel: x, y
+                # on top of the latent vector
+                nn.Linear(2 + latent_len, num_neurons, bias=include_bias),
+                nn.Tanh(),
+            ]
+
+        # Hidden layers
+        layers.extend(
+            num_hidden_layers
+            * [nn.Linear(num_neurons, num_neurons, bias=False), nn.Tanh()]
+        )
+
+        # Output layer
+        if rgb:
+            layers.extend([nn.Linear(num_neurons, 3, bias=False), nn.Sigmoid()])
+        else:
+            layers.extend([nn.Linear(num_neurons, 1, bias=False), nn.Sigmoid()])
+
+        # Assign layers to self.layers
+        return nn.Sequential(*layers)
 
 
 def create_input(
