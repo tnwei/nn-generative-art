@@ -11,4 +11,8 @@ dependencies:
   - ipywidgets
   - tqdm
   - pylint
+  - onnx
+  - pip:
+      - onnxruntime
+      - torchsummary
 prefix: /home/tnwei/miniconda3/envs/nn-gen-art
