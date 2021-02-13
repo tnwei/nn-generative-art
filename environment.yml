@@ -1,11 +1,13 @@
 name: nn-gen-art
 channels:
+  - pytorch
   - conda-forge
   - defaults
 dependencies:
   - matplotlib
   - numpy
   - pytorch
+  - cpuonly
   - ipykernel
   - opencv
   - ipywidgets
