@@ -4,6 +4,7 @@ import torch
 import matplotlib.pyplot as plt
 from PIL import Image
 from typing import List, Dict, Any, NoReturn
+from collections import OrderedDict
 
 
 class Net(nn.Module):
@@ -109,36 +110,56 @@ class Net(nn.Module):
         """
         Initializes the architecture of the network.
         """
+        layers = OrderedDict()
+
         # Input layer
         if include_dist_to_origin:
-            layers: List[Any] = [
-                # 3 base inputs per pixel: x, y, distance to origin
-                # on top of the latent vector
-                nn.Linear(3 + latent_len, num_neurons, bias=include_bias),
-                nn.Tanh(),
-            ]
+            layers.update(
+                {
+                    # 3 base inputs per pixel: x, y, distance to origin
+                    # on top of the latent vector
+                    "fc0": nn.Linear(3 + latent_len, num_neurons, bias=include_bias),
+                    "tanh0": nn.Tanh(),
+                }
+            )
+
         else:
-            layers: List[Any] = [
-                # 2 base inputs per pixel: x, y
-                # on top of the latent vector
-                nn.Linear(2 + latent_len, num_neurons, bias=include_bias),
-                nn.Tanh(),
-            ]
+            layers.update(
+                {
+                    # 2 base inputs per pixel: x, y
+                    # on top of the latent vector
+                    "fc0": nn.Linear(2 + latent_len, num_neurons, bias=include_bias),
+                    "tanh0": nn.Tanh(),
+                }
+            )
 
         # Hidden layers
-        layers.extend(
-            num_hidden_layers
-            * [nn.Linear(num_neurons, num_neurons, bias=False), nn.Tanh()]
-        )
+        for i in range(num_hidden_layers):
+            layers.update(
+                {
+                    "fc" + str(i + 1): nn.Linear(num_neurons, num_neurons, bias=False),
+                    "tanh" + str(i + 1): nn.Tanh(),
+                }
+            )
 
         # Output layer
         if rgb:
-            layers.extend([nn.Linear(num_neurons, 3, bias=False), nn.Sigmoid()])
+            layers.update(
+                {
+                    "fc" + str(i + 1 + 1): nn.Linear(num_neurons, 3, bias=False),
+                    "sigmoid": nn.Sigmoid(),
+                }
+            )
         else:
-            layers.extend([nn.Linear(num_neurons, 1, bias=False), nn.Sigmoid()])
+            layers.update(
+                {
+                    "fc" + str(i + 1 + 1): nn.Linear(num_neurons, 1, bias=False),
+                    "sigmoid": nn.Sigmoid(),
+                }
+            )
 
         # Assign layers to self.layers
-        return nn.Sequential(*layers)
+        return nn.Sequential(layers)
 
 
 def create_input(
