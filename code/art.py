@@ -224,10 +224,11 @@ def generate_one_art(
     latent_vec = np.repeat(latent_vec, repeats=net_input.shape[0], axis=0)
     latent_vec = torch.tensor(latent_vec).float()
 
-    assert net_input.shape == latent_vec.shape, (
-        "Shape of net_input is "
-        f"{net_input.shape} while shape of latent_vec is {latent_vec.shape}"
-    )
+    # This logic is wrong!
+    # assert net_input.shape == latent_vec.shape, (
+    #     "Shape of net_input is "
+    #     f"{net_input.shape} while shape of latent_vec is {latent_vec.shape}"
+    # )
 
     # Run input through net
     net_output = net(net_input, latent_vec).detach().numpy()

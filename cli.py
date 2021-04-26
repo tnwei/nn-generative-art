@@ -3,7 +3,7 @@ Run `python cli.py` to generate abstract art using neural networks on the fly.
 """
 
 from code.art import Net, generate_one_art
-from code.sampler import LatentSpaceSampler
+from code.sampler import LatentSpaceSampler, BezierSampler
 import cv2
 import time
 from timeit import default_timer as timer
@@ -18,6 +18,12 @@ parser.add_argument(
     "--YDIM", help="Dimension of Y, defaults to 90", type=int, default=90
 )
 parser.add_argument(
+    "--sampler",
+    help="Choose 'random' sampler or 'bezier' sampler to explore the latent space",
+    type=str,
+    default="random",
+)
+parser.add_argument(
     "--scale",
     help="Scale factor to resize the image, defaults to 4",
     type=float,
@@ -28,12 +34,23 @@ parser.add_argument(
     help="Lifts cap on max frames per second, not recommended",
     action="store_true",
 )
+
 args = parser.parse_args()
+assert args.sampler in ["random", "bezier"], f"--sampler received {args.sampler}"
 
 if __name__ == "__main__":
     XDIM, YDIM = args.XDIM, args.YDIM
-    lss = LatentSpaceSampler(min_coord=[-2, -2, -2], max_coord=[2, 2, 2], stepsize=0.05)
-    net = Net(num_hidden_layers=2, num_neurons=64)
+    if args.sampler == "random":
+        lss = LatentSpaceSampler(
+            min_coord=[-2, -2, -2], max_coord=[2, 2, 2], stepsize=0.05
+        )
+        net = Net(num_hidden_layers=2, num_neurons=64, latent_len=3)
+    elif args.sampler == "bezier":
+        lss = BezierSampler(num_ctrl_points=5, steps=1000)
+        net = Net(num_hidden_layers=2, num_neurons=64, latent_len=2)
+    else:
+        raise ValueError
+
     max_fps = 24
     max_frame_duration = 1 / max_fps
 
