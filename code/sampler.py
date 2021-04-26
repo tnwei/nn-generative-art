@@ -5,6 +5,7 @@ smooth (enough) trajectories within a designated latent space.
 
 import numpy as np
 from typing import NoReturn, Generator
+from .bezier import gen_bezier_ctrl_points, bezier_mat
 
 
 class LatentSpaceSampler:
@@ -155,3 +156,27 @@ class LatentSpaceSampler:
             ans.append(next(self.generator))
 
         return ans
+
+
+def bezier_sampler(num_ctrl_points=5, steps=50):
+    prev_ctrl_points = None
+    while True:
+        ctrl_points = gen_bezier_ctrl_points(num_ctrl_points, prev_ctrl_points)
+        if prev_ctrl_points is not None:
+            assert np.array_equal(
+                ctrl_points[0, :], prev_ctrl_points[-1, :]
+            ), f"{ctrl_points[0, :]}, {prev_ctrl_points[-1, :]}"
+        nx, ny = bezier_mat(ctrl_points, steps)
+
+        for i in range(steps):
+            yield np.array([nx[i], ny[i]])
+
+        prev_ctrl_points = ctrl_points.copy()
+
+
+class BezierSampler:
+    def __init__(self, num_ctrl_points=5, steps=50):
+        self.generator = bezier_sampler(num_ctrl_points, steps)
+
+    def sample(self):
+        return next(self.generator)
