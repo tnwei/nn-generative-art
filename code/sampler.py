@@ -5,7 +5,11 @@ smooth (enough) trajectories within a designated latent space.
 
 import numpy as np
 from typing import NoReturn, Generator
-from .bezier import gen_bezier_ctrl_points, bezier_mat
+
+try:
+    from .bezier import gen_bezier_ctrl_points, bezier_mat
+except:
+    from bezier import gen_bezier_ctrl_points, bezier_mat
 
 
 class LatentSpaceSampler:
