@@ -4,7 +4,7 @@ smooth (enough) trajectories within a designated latent space.
 """
 
 import numpy as np
-from typing import NoReturn, Generator
+from typing import NoReturn, Generator, Optional
 
 try:
     from .bezier import gen_bezier_ctrl_points, bezier_mat
@@ -21,17 +21,8 @@ class LatentSpaceSampler:
         min_coord: np.ndarray = np.array([-1, -1, -1]),
         max_coord: np.ndarray = np.array([1, 1, 1]),
         smooth_start_stop: bool = True,
+        keep_past_latent_vecs: Optional[int] = None,
     ) -> NoReturn:
-        """
-        Input
-        -----
-        dims: int
-        init_coord: iterable
-        stepsize: int
-        min_coord: iterable
-        max_coord: iterable
-        smooth_start_stop: bool
-        """
         # Check to ensure all inputs have the correct dimensions
         assert len(init_coord) == dims
         assert len(min_coord) == dims
@@ -54,6 +45,8 @@ class LatentSpaceSampler:
         self.init_coord = init_coord
         self.stepsize = stepsize
         self.smooth_start_stop = smooth_start_stop
+        self.keep_past_latent_vecs = keep_past_latent_vecs
+        self.past_latent_vecs = []
 
         # Initialize the generator
         self._init_generator()
@@ -132,9 +125,22 @@ class LatentSpaceSampler:
                 pass
 
             for i in range(steps.shape[0]):
+                self.update_latent_vecs(steps[i, :])
                 yield steps[i, :]
 
             current_point = next_point
+
+    def update_latent_vecs(self, latent_vec: np.ndarray) -> NoReturn:
+        """
+        Adds latent_vec to store and trims the list if too long
+        """
+        if self.keep_past_latent_vecs is None:
+            pass
+        else:
+            self.past_latent_vecs.append(latent_vec)
+
+            if len(self.past_latent_vecs) > self.keep_past_latent_vecs:
+                self.past_latent_vecs.pop(0)
 
     def sample(
         self, iterations: int = 1, return_value_if_one: bool = True
@@ -179,8 +185,26 @@ def bezier_sampler(num_ctrl_points=5, steps=50):
 
 
 class BezierSampler:
-    def __init__(self, num_ctrl_points=5, steps=50):
+    def __init__(
+        self, num_ctrl_points=5, steps=50, keep_past_latent_vecs: Optional[int] = None
+    ):
         self.generator = bezier_sampler(num_ctrl_points, steps)
+        self.keep_past_latent_vecs = keep_past_latent_vecs
+        self.past_latent_vecs = []
 
     def sample(self):
-        return next(self.generator)
+        next_latent_vec = next(self.generator)
+        self.update_latent_vecs(next_latent_vec)
+        return next_latent_vec
+
+    def update_latent_vecs(self, latent_vec: np.ndarray) -> NoReturn:
+        """
+        Adds latent_vec to store and trims the list if too long
+        """
+        if self.keep_past_latent_vecs is None:
+            pass
+        else:
+            self.past_latent_vecs.append(latent_vec)
+
+            if len(self.past_latent_vecs) > self.keep_past_latent_vecs:
+                self.past_latent_vecs.pop(0)
