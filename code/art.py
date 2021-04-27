@@ -163,7 +163,13 @@ class Net(nn.Module):
 
 
 def create_input(
-    img_width: int, img_height: int, include_dist_to_origin: bool = True
+    img_width: int,
+    img_height: int,
+    include_dist_to_origin: bool = True,
+    xs_start: float = -1,
+    xs_stop: float = 1,
+    ys_start: float = -1,
+    ys_stop: float = 1,
 ) -> np.ndarray:
     """
     Creates the input for the generative net.
