@@ -6,6 +6,7 @@ from code.art import Net, generate_one_art
 from code.sampler import LatentSpaceSampler, BezierSampler
 import cv2
 import time
+import numpy as np
 from timeit import default_timer as timer
 import sys
 import argparse
@@ -31,7 +32,12 @@ parser.add_argument(
 )
 parser.add_argument(
     "--noframelimit",
-    help="Lifts cap on max frames per second, not recommended",
+    help="If passed, lifts cap on max frames per second (24fps), not recommended",
+    action="store_true",
+)
+parser.add_argument(
+    "--kaleidoscope",
+    help="If passed, generates top-left quadrant of the image and mirrors across x-y axes for a kaleidoscope effect. Note: Doubles width and height before scale factor is applied",
     action="store_true",
 )
 
@@ -72,11 +78,40 @@ if __name__ == "__main__":
             # Explicitly checking that the window is closed to end the loop
             frame_start = timer()
 
-            out = generate_one_art(
-                net,
-                latent_vec=lss.sample(),
-                input_config={"img_width": XDIM, "img_height": YDIM},
-            )
+            if args.kaleidoscope is True:
+                out = generate_one_art(
+                    net,
+                    latent_vec=lss.sample(),
+                    input_config={
+                        "img_width": XDIM,
+                        "img_height": YDIM,
+                        "xs_start": -1,
+                        "xs_stop": 0,
+                        "ys_start": -1,
+                        "ys_stop": 0,
+                    },
+                )
+                # Kaleidoscope ------------------------------
+                # `out` is top-left
+                # Flip the array accordingly
+                # axis=0 is rows, which are y-dim
+                top_right = np.flip(out, axis=(1))
+                bot_right = np.flip(out, axis=(0, 1))
+                bot_left = np.flip(out, axis=(0))
+
+                # Join them
+                left_col = np.concatenate((out, bot_left), axis=0)
+                right_col = np.concatenate((top_right, bot_right), axis=0)
+                out = np.concatenate((left_col, right_col), axis=1)
+
+                # End kaleidoscope --------------------------
+
+            else:
+                out = generate_one_art(
+                    net,
+                    latent_vec=lss.sample(),
+                    input_config={"img_width": XDIM, "img_height": YDIM},
+                )
 
             # Convert to BGR
             out = cv2.cvtColor(out, cv2.COLOR_RGB2BGR)
