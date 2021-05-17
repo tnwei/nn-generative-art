@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from PIL import Image
-from typing import List, Dict, Any, NoReturn, Optional
+from typing import List, Dict, Any, NoReturn, Optional, Union
 from collections import OrderedDict
 import scipy.sparse as sp
 from functools import lru_cache
@@ -127,6 +127,7 @@ class Net(nn.Module):
     def init_weights(self) -> NoReturn:
         """
         Initializes the weights of the network.
+        Can also be used to re-init weights
         """
         self.apply(self._init_weights)
 
@@ -303,11 +304,7 @@ def generate_one_art(
 
 
 def generate_one_gallery(
-    net_config: Dict[str, Any] = {
-        "num_hidden_layers": 4,
-        "num_neurons": 8,
-        "include_bias": True,
-    },
+    nets: Optional[Union[Net, List[Net]]],
     input_config: Dict[str, Any] = {"img_width": 320, "img_height": 320},
 ) -> NoReturn:
     """
@@ -326,30 +323,35 @@ def generate_one_gallery(
     ------
     None
     """
+    # Wrap into list if not already
+    if isinstance(nets, Net):
+        nets = [nets]
+
     _, ax = plt.subplots(ncols=10, nrows=4, figsize=(16, 6))
 
-    for i in range(10):
-        net = Net(**net_config)
-        latent_vec = np.random.normal(size=(3,))
+    for net in nets:
+        for i in range(10):
+            net.init_weights()
+            latent_vec = np.random.normal(size=(3,))
 
-        for j in range(4):
-            out = generate_one_art(
-                net, latent_vec=latent_vec, input_config=input_config
-            )
-            latent_vec += 0.2
+            for j in range(4):
+                out = generate_one_art(
+                    net, latent_vec=latent_vec, input_config=input_config
+                )
+                latent_vec += 0.2
 
-            # if (n, n, 1) output i.e. if grayscale
-            if out.shape[2] == 1:
-                img = Image.fromarray(
-                    np.squeeze(out), mode="L"
-                )  # Mode inference is automatic but better be explicit
-                ax[j, i].imshow(img, cmap="gray")
-            else:
-                img = Image.fromarray(out, mode="RGB")
-                ax[j, i].imshow(img, cmap="gray")
+                # if (n, n, 1) output i.e. if grayscale
+                if out.shape[2] == 1:
+                    img = Image.fromarray(
+                        np.squeeze(out), mode="L"
+                    )  # Mode inference is automatic but better be explicit
+                    ax[j, i].imshow(img, cmap="gray")
+                else:
+                    img = Image.fromarray(out, mode="RGB")
+                    ax[j, i].imshow(img, cmap="gray")
 
-            ax[j, i].xaxis.set_visible(False)
-            ax[j, i].yaxis.set_visible(False)
+                ax[j, i].xaxis.set_visible(False)
+                ax[j, i].yaxis.set_visible(False)
 
-    plt.tight_layout()
-    plt.show()
+        plt.tight_layout()
+        plt.show()
