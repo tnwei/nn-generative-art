@@ -3,8 +3,38 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from PIL import Image
-from typing import List, Dict, Any, NoReturn
+from typing import List, Dict, Any, NoReturn, Optional
 from collections import OrderedDict
+import scipy.sparse as sp
+from functools import lru_cache
+
+
+def find_min_dist_mat(R: np.ndarray) -> np.ndarray:
+    """
+    R is reference array
+    Returns distance array D
+    
+    Note: cannot use lru_cache from functools because np.ndarray
+    is not hashable by Python
+    """
+    D = np.full(shape=R.shape, fill_value=np.nan)
+    sparse_R = sp.coo_matrix(R)
+
+    for i in range(D.shape[0]):
+        for j in range(D.shape[1]):
+            # Init min dist to closest reference point, as max possible dist
+            min_dist = np.linalg.norm([D.shape[0], D.shape[1]])
+            anchor_point = (np.nan, np.nan)
+            # Have checked, NaNs are omitted so below returns all points of interest only
+            for ri, rj in zip(sparse_R.row, sparse_R.col):
+                if np.linalg.norm([i - ri, j - rj]) < min_dist:
+                    anchor_point = (ri, rj)
+                    min_dist = np.linalg.norm([i - ri, j - rj])
+
+            # Update min_dist in array
+            D[i, j] = min_dist
+
+    return D
 
 
 class Net(nn.Module):
@@ -20,6 +50,7 @@ class Net(nn.Module):
         latent_len: int = 3,
         include_bias: bool = True,
         include_dist_to_origin: bool = True,
+        include_R: bool = False,
         rgb: bool = True,
     ) -> NoReturn:
         """
@@ -47,6 +78,7 @@ class Net(nn.Module):
             latent_len=latent_len,
             include_bias=include_bias,
             include_dist_to_origin=include_dist_to_origin,
+            include_R=include_R,
             rgb=rgb,
         )
 
@@ -105,6 +137,7 @@ class Net(nn.Module):
         latent_len,
         include_bias,
         include_dist_to_origin,
+        include_R,
         rgb,
     ) -> nn.Sequential:
         """
@@ -112,26 +145,22 @@ class Net(nn.Module):
         """
         layers = OrderedDict()
 
-        # Input layer
+        # Input dims
+        # 2 base inputs per pixel: (x, y) on top of the latent vector
+        input_dims = 2
         if include_dist_to_origin:
-            layers.update(
-                {
-                    # 3 base inputs per pixel: x, y, distance to origin
-                    # on top of the latent vector
-                    "fc0": nn.Linear(3 + latent_len, num_neurons, bias=include_bias),
-                    "tanh0": nn.Tanh(),
-                }
-            )
+            input_dims += 1
+        if include_R:
+            input_dims += 1
 
-        else:
-            layers.update(
-                {
-                    # 2 base inputs per pixel: x, y
-                    # on top of the latent vector
-                    "fc0": nn.Linear(2 + latent_len, num_neurons, bias=include_bias),
-                    "tanh0": nn.Tanh(),
-                }
-            )
+        layers.update(
+            {
+                "fc0": nn.Linear(
+                    input_dims + latent_len, num_neurons, bias=include_bias
+                ),
+                "tanh0": nn.Tanh(),
+            }
+        )
 
         # Hidden layers
         for i in range(num_hidden_layers):
@@ -166,6 +195,7 @@ def create_input(
     img_width: int,
     img_height: int,
     include_dist_to_origin: bool = True,
+    R: Optional[np.ndarray] = None,
     xs_start: float = -1,
     xs_stop: float = 1,
     ys_start: float = -1,
@@ -178,26 +208,41 @@ def create_input(
     -----
     img_width, img_height: int
     include_dist_to_origin: bool
+    R is a reference array that is an extension of include_dist_to_origin
 
     Output
     ------
     input_arr: np.ndarray
         Should have shape (img_width * img_height, 2)
     """
+    if R is not None:
+        assert isinstance(R, np.ndarray)
+        assert R.shape == (
+            img_height,
+            img_width,
+        ), f"R.shape is {R.shape} which is not {(img_height, img_width)}"
+
     # Create vectors of xs and ys
     xs = np.linspace(start=-1, stop=1, num=img_width)
     ys = np.linspace(start=-1, stop=1, num=img_height)
 
     # Use np.meshgrid to create a mesh grid
     xv, yv = np.meshgrid(xs, ys)
-    input_arr = np.stack((xv, yv), axis=2)
+    input_arr_grid = np.stack((xv, yv), axis=2)
+
+    # Reshape input to NN as one row per pixel
+    input_arr = input_arr_grid.reshape(img_width * img_height, 2)
 
     if include_dist_to_origin:
-        dist_to_origin = np.sum(np.square(input_arr), axis=2, keepdims=True)
-        input_arr = np.concatenate([input_arr, dist_to_origin], axis=2)
-        input_arr = input_arr.reshape(img_width * img_height, 3)
-    else:
-        input_arr = input_arr.reshape(img_width * img_height, 2)
+        dist_to_origin = np.sum(np.square(input_arr_grid), axis=2, keepdims=True)
+        dist_to_origin = dist_to_origin.reshape(img_width * img_height, 1)
+        input_arr = np.concatenate([input_arr, dist_to_origin], axis=1)
+
+    if R is not None:
+        # Find min_dist_matrix from R, and reformat into correct input shape
+        min_dist_mat = find_min_dist_mat(R)
+        min_dist_mat = min_dist_mat.reshape(img_width * img_height, 1)
+        input_arr = np.concatenate([input_arr, min_dist_mat], axis=1)
 
     return input_arr
 
@@ -205,7 +250,8 @@ def create_input(
 def generate_one_art(
     net: Net,
     latent_vec: torch.Tensor,
-    input_config: Dict[str, Any] = {"img_width": 320, "img_height": 320},
+    net_input: Optional[np.ndarray] = None,
+    input_config: Optional[Dict[str, Any]] = {"img_width": 320, "img_height": 320},
 ) -> np.ndarray:
     """
     Wrapper function to generate a single image output from the given network.
@@ -214,16 +260,22 @@ def generate_one_art(
     -----
     net: Net
     latent_vec: torch.Tensor
+    input_arr: output of `create_input`
     input_config: dict
         Dict of parameters to be passed to `create_input` as kwargs.
+
+    TODO: Think about removing img_width and img_height from input_config
 
     Output
     ------
     net_output: np.ndarray
         Should have shape (y, x, 3) or (y, x, 1)
     """
-    # Create input to net, and convert from ndarray to torch.FloatTensor
-    net_input = torch.tensor(create_input(**input_config)).float()
+    if net_input is None:
+        # Create input to net, and convert from ndarray to torch.FloatTensor
+        net_input = torch.tensor(create_input(**input_config)).float()
+    else:
+        net_input = torch.tensor(net_input).float()
 
     # Create input array from latent_vec, and convert from ndarray to torch.FloatTensor
     latent_vec = np.expand_dims(latent_vec, axis=0)
