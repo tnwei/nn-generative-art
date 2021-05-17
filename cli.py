@@ -137,7 +137,7 @@ if __name__ == "__main__":
 
             if pressed_key == ord("r"):
                 # Refresh the net
-                net = Net(num_hidden_layers=2, num_neurons=64, latent_len=latent_len)
+                net.init_weights()
             elif pressed_key == ord("q"):
                 # Exit
                 break
