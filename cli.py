@@ -45,18 +45,20 @@ args = parser.parse_args()
 assert args.sampler in ["random", "bezier"], f"--sampler received {args.sampler}"
 
 if __name__ == "__main__":
+    print("Run `python cli.py -h` to see all options")
     XDIM, YDIM = args.XDIM, args.YDIM
     if args.sampler == "random":
         lss = LatentSpaceSampler(
             min_coord=[-2, -2, -2], max_coord=[2, 2, 2], stepsize=0.05
         )
-        net = Net(num_hidden_layers=2, num_neurons=64, latent_len=3)
+        latent_len = 3
     elif args.sampler == "bezier":
         lss = BezierSampler(num_ctrl_points=5, steps=1000)
-        net = Net(num_hidden_layers=2, num_neurons=64, latent_len=2)
+        latent_len = 2
     else:
         raise ValueError
 
+    net = Net(num_hidden_layers=2, num_neurons=64, latent_len=latent_len)
     max_fps = 24
     max_frame_duration = 1 / max_fps
 
@@ -129,7 +131,15 @@ if __name__ == "__main__":
             # Display
             cv2.imshow(window_name, out)
 
-            if cv2.waitKey(1) & 0xFF == ord("q"):
+            # Catch pressed keys
+            # 0xFF ref: https://stackoverflow.com/a/39203128/13095028
+            pressed_key = cv2.waitKey(1) & 0xFF
+
+            if pressed_key == ord("r"):
+                # Refresh the net
+                net = Net(num_hidden_layers=2, num_neurons=64, latent_len=latent_len)
+            elif pressed_key == ord("q"):
+                # Exit
                 break
 
             if frame_count % 10 == 0:
