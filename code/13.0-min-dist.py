@@ -75,7 +75,7 @@ if __name__ == "__main__":
             alpha_composite = Image.alpha_composite(background, im)
             return 1 - np.array(alpha_composite.convert("L")) / 255
 
-        R = im_png_to_arr(Image.open("160x90-smiley.png"))
+        R = im_png_to_arr(Image.open("assets/160x90-smiley.png"))
         include_R = True
     else:
         R = None
