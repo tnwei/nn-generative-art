@@ -2,7 +2,7 @@
 Run `python cli.py` to generate abstract art using neural networks on the fly.
 """
 
-from code.art import Net, generate_one_art
+from code.art import Net, generate_one_art, create_input
 from code.sampler import LatentSpaceSampler, BezierSampler
 import cv2
 import time
@@ -73,6 +73,17 @@ if __name__ == "__main__":
 
     frame_count = 0
 
+    # Generate input to the CPPN once and re-use throughout
+    input_config = {
+        "img_width": XDIM,
+        "img_height": YDIM,
+        "xs_start": -1,
+        "xs_stop": 0,
+        "ys_start": -1,
+        "ys_stop": 0,
+    }
+    net_input = create_input(**input_config)
+
     try:
         while cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) > 0:
             # Was going to just be `while True`
@@ -84,14 +95,8 @@ if __name__ == "__main__":
                 out = generate_one_art(
                     net,
                     latent_vec=lss.sample(),
-                    input_config={
-                        "img_width": XDIM,
-                        "img_height": YDIM,
-                        "xs_start": -1,
-                        "xs_stop": 0,
-                        "ys_start": -1,
-                        "ys_stop": 0,
-                    },
+                    net_input=net_input,
+                    input_config=input_config,
                 )
                 # Kaleidoscope ------------------------------
                 # `out` is top-left
@@ -112,7 +117,8 @@ if __name__ == "__main__":
                 out = generate_one_art(
                     net,
                     latent_vec=lss.sample(),
-                    input_config={"img_width": XDIM, "img_height": YDIM},
+                    net_input=net_input,
+                    input_config=input_config,
                 )
 
             # Convert to BGR
