@@ -123,7 +123,10 @@ if __name__ == "__main__":
     net_input = create_input(**input_config)
 
     try:
-        while cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) > 0:
+        # Rasp pi cv2.WND_PROP_VISIBLE is bugged atm, use WND_PROP_ASPECT_RATIO as workaround to detect win exists
+        while (cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) > 0) or (
+            cv2.getWindowProperty(window_name, cv2.WND_PROP_ASPECT_RATIO) > 0
+        ):
             # Was going to just be `while True`
             # But OpenCV windows don't stay closed when you close them in the GUI!
             # Explicitly checking that the window is closed to end the loop
