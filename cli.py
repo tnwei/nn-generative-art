@@ -33,6 +33,11 @@ parser.add_argument(
     default=4,
 )
 parser.add_argument(
+    "--grayscale",
+    help="Toggle on grayscale output. Default is to use RGB",
+    action="store_true",
+)
+parser.add_argument(
     "--noframelimit",
     help="If passed, lifts cap on max frames per second (24fps), not recommended",
     action="store_true",
@@ -67,6 +72,11 @@ if __name__ == "__main__":
     else:
         raise ValueError
 
+    if args.grayscale is True:
+        rgb = False
+    else:
+        rgb = True
+
     if args.onnx_model is not None:
         try:
             # Validate ONNX model
@@ -81,9 +91,11 @@ if __name__ == "__main__":
         except Exception as e:
             print(e)
             print("Reverting to init local model")
-            net = Net(num_hidden_layers=2, num_neurons=64, latent_len=latent_len)
+            net = Net(
+                num_hidden_layers=2, num_neurons=64, latent_len=latent_len, rgb=rgb
+            )
     else:
-        net = Net(num_hidden_layers=2, num_neurons=64, latent_len=latent_len)
+        net = Net(num_hidden_layers=2, num_neurons=64, latent_len=latent_len, rgb=rgb)
 
     max_fps = 24
     max_frame_duration = 1 / max_fps
