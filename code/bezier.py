@@ -1,9 +1,20 @@
 import numpy as np
-from math import comb
 from typing import Tuple, Optional
+from math import factorial
 
 # Logic modified from Omar Aflak's gist for Bezier interpolation:
 # https://gist.githubusercontent.com/OmarAflak/860ef23fcdd57dfd83470381f5db9b31/raw/367163e81eabdfdbfa26e3e4cc06ac85b54c7cf0/medium_bezier_matrix.py
+
+
+def comb(n, k):
+    """
+    Equivalent to math.comb(), which is only available Python3.8 onwards.
+    ref: https://docs.python.org/3.8/library/math.html#math.comb
+    """
+    if k <= n:
+        return factorial(n) / (factorial(k) * factorial(n - k))
+    else:
+        return 0
 
 
 def get_bezier_mat(n: int) -> np.ndarray:
