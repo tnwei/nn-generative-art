@@ -196,8 +196,8 @@ def create_input(
         ), f"R.shape is {R.shape} which is not {(img_height, img_width)}"
 
     # Create vectors of xs and ys
-    xs = np.linspace(start=-1, stop=1, num=img_width)
-    ys = np.linspace(start=-1, stop=1, num=img_height)
+    xs = np.linspace(start=xs_start, stop=xs_stop, num=img_width)
+    ys = np.linspace(start=ys_start, stop=ys_stop, num=img_height)
 
     # Use np.meshgrid to create a mesh grid
     xv, yv = np.meshgrid(xs, ys)
