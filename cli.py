@@ -63,11 +63,11 @@ if __name__ == "__main__":
 
     if args.sampler == "random":
         lss = LatentSpaceSampler(
-            min_coord=[-2, -2, -2], max_coord=[2, 2, 2], stepsize=0.05
+            min_coord=[-2, -2, -2], max_coord=[2, 2, 2], stepsize=0.01
         )
         latent_len = 3
     elif args.sampler == "bezier":
-        lss = BezierSampler(num_ctrl_points=5, steps=1000)
+        lss = BezierSampler(num_ctrl_points=5, steps=200)
         latent_len = 2
     else:
         raise ValueError
@@ -115,6 +115,7 @@ if __name__ == "__main__":
     input_config = {
         "img_width": XDIM,
         "img_height": YDIM,
+        # Coordinates to pass in
         "xs_start": -1,
         "xs_stop": 0,
         "ys_start": -1,
